@@ -11,6 +11,7 @@ typedef struct {
 } Flags;
 
 void compile_unit(FILE* f);
+char* preprocess(const char* prog);
 
 int main(int argc, char** argv) { 
     Flags flags;
@@ -57,6 +58,47 @@ void compile_unit(FILE* f) {
     fprintf(stderr,"read file into buffer of size %lu\n", fsize);
     prog[fsize] = '\0';
     fprintf(stderr, "%s\n", prog);
-    TokenMaps tokenmaps = createlextokenmaps();
-    TokenListList list = lex(prog, &tokenmaps); 
-};
+    prog = preprocess(prog);
+    fprintf(stderr, "---\n");
+    fprintf(stderr, "%s\n", prog);
+    TokenizedProg tokenized = lex(prog);
+    for(TokenizedLine* line = tokenized.linev; line-tokenized.linev < tokenized.linec; line++) {
+        for(Token* token = line->tokenv; token-line->tokenv < line->tokenc; token++) {
+            switch(token->type) {
+                case TokenInteger:
+                    fprintf(stderr, "[ Int %d ] ", *(int*)token->data);
+                    break;
+                case TokenSeparator:
+                    fprintf(stderr, "[ Sep %c ] ", ". "[token->id]);
+                    break;
+                case TokenWord:
+                    fprintf(stderr, "[ Word '%s' ] ", (char*)token->data);
+                    break;
+            }
+        }
+        fprintf(stderr, "\n");
+    }
+}
+
+char* preprocess(const char* prog) {
+    enum { StateTitle, StateComment, StateProg };
+    int state = StateTitle;
+    char* processed_prog = malloc(strlen(prog)*sizeof(char));
+    char* process_p = processed_prog;
+    for(const char* c = prog; *c != '\0'; c++) {
+        if(*c == '\n' && c[1] == '\n') 
+            continue;
+        switch(state) {
+            case StateTitle:
+                if(*c == '\n') state++;
+            case StateProg:
+                *process_p++ = *c;
+                break;
+            case StateComment:
+                if(*c == '\n') state++;
+                break;
+        }
+    }
+    *process_p = '\0';
+    return processed_prog;
+}
