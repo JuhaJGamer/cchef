@@ -1,6 +1,17 @@
 #include <stdlib.h>
 
-enum { TokenEmpty, TokenInteger, TokenSeparator, TokenWord };
+enum { TokenEmpty, TokenInteger, TokenSeparator, TokenWord, TokenMeasure, TokenKeyword, TokenIngredient };
+enum { TokenMeasureG,
+TokenMeasureKg,
+TokenMeasurePinch,
+TokenMeasureMl,
+TokenMeasureL,
+TokenMeasureDash,
+TokenMeasureCup,
+TokenMeasureTsp,
+TokenMeasureTblsp,
+TokenMeasureHeaped,
+TokenMeasureLevel };
 
 typedef struct Token Token;
 typedef struct TokenizedLine TokenizedLine;

@@ -218,7 +218,164 @@ TokenizedProg lexer_parsing_pass(const char* prog) {
  * Recognizes (some) context to turn "Word" into "Measure" or "Keyword"
  */
 TokenizedProg lexer_token_pass(TokenizedProg prog) {
-    // TODO: code
+    enum { StateNone, StateKeyword, StateIngredient, StateMeasure }; 
+    int state = StateNone;
 
-    return prog;
+    LinkedTokenizedLine baseltokenizedline = create_ltokenizedline();
+    LinkedTokenizedLine* ltokenizedline = &baseltokenizedline;
+    LinkedTokenizedProg baseltokenizedprog = create_ltokenizedprog();
+    LinkedTokenizedProg* ltokenizedprog = &baseltokenizedprog;
+    Token token = create_token();
+
+    for(TokenizedLine* linep = prog.linev; linep-prog.linev < prog.linec; linep++) {
+        for(Token* tokenp = linep->tokenv; tokenp-linep->tokenv < linep->tokenc; tokenp++) {
+            if(state == StateNone) {
+                switch(tokenp->type) {
+                    case TokenInteger:
+                        state = StateMeasure;
+                        append_ltokenizedline(*tokenp, &ltokenizedline);
+                        continue;
+                    case TokenWord:
+                        state = StateKeyword;
+                        break;
+                }
+            }        
+            if(tokenp->type == TokenSeparator && tokenp->id == 0) {
+                token = *tokenp; 
+                append_ltokenizedline(token, &ltokenizedline);
+                token = create_token();
+                if(tokenp-linep->tokenv < linep->tokenc-1) {
+                    TokenizedLine tokenizedline = collapse_ltokenizedline(baseltokenizedline);
+                    free_ltokenizedline(baseltokenizedline.next);
+                    append_ltokenizedprog(tokenizedline, &ltokenizedprog);
+                    baseltokenizedline = create_ltokenizedline();
+                    ltokenizedline = &baseltokenizedline;
+                    state = StateNone;
+                }
+                continue;
+            }
+            switch(state) {
+                case StateMeasure:
+                    if(tokenp->type != TokenWord) {
+                        state = StateNone;
+                        break;
+                    } 
+                    else if (!strcmp("g",tokenp->data)) {
+                        token = (Token) { TokenMeasure, TokenMeasureG, NULL };
+                    }
+                    else if (!strcmp("kg",tokenp->data)) {
+                        token = (Token) { TokenMeasure, TokenMeasureKg, NULL };
+                    }
+                    else if (!strncmp("pinch",tokenp->data,5)) {
+                        token = (Token) { TokenMeasure, TokenMeasurePinch, NULL };
+                    }
+                    else if (!strcmp("ml",tokenp->data)) {
+                        token = (Token) { TokenMeasure, TokenMeasureMl, NULL };
+                    }
+                    else if (!strcmp("l",tokenp->data)) {
+                        token = (Token) { TokenMeasure, TokenMeasureL, NULL };
+                    }
+                    else if (!strncmp("dash",tokenp->data, 4)) {
+                        token = (Token) { TokenMeasure, TokenMeasureDash, NULL };
+                    }
+                    else if (!strncmp("cup",tokenp->data, 3)) {
+                        token = (Token) { TokenMeasure, TokenMeasureCup, NULL };
+                    }
+                    else if (!strncmp("teaspoon",tokenp->data,8)) {
+                        token = (Token) { TokenMeasure, TokenMeasureTsp, NULL };
+                    }
+                    else if (!strncmp("tablespoon",tokenp->data,10)) {
+                        token = (Token) { TokenMeasure, TokenMeasureTblsp, NULL };
+                    } 
+                    else if (!strcmp("heaped",tokenp->data)) {
+                        token = (Token) { TokenMeasure, TokenMeasureHeaped, NULL };
+                    }
+                    else if (!strcmp("level",tokenp->data)) {
+                        token = (Token) { TokenMeasure, TokenMeasureLevel, NULL };
+                    }
+                    else {
+                        state = StateIngredient;
+                        tokenp--;
+                        break;
+                    }
+                    append_ltokenizedline(token, &ltokenizedline);
+                    token = create_token();
+                    break;
+                case StateIngredient:
+                    if(!strcmp("from", tokenp->data)
+                            || !strcmp("into", tokenp->data)
+                            || !strcmp("to", tokenp->data)
+                            || !strcmp("until", tokenp->data)) {
+                        state = StateKeyword;
+                        tokenp--;
+                        append_ltokenizedline(token, &ltokenizedline);
+                        token = create_token();
+                        continue;
+                    }
+                    if ((char*)token.data == NULL) {
+                        token.type = TokenIngredient;
+                        token.data = malloc(sizeof(char)*strlen(tokenp->data)+1);
+                        strcpy(token.data,tokenp->data);
+                    } else {
+                        size_t oldlen = strlen(token.data);
+                        token.data = realloc(token.data, oldlen+strlen(tokenp->data)+1);
+                        ((char*)token.data)[oldlen] = ' ';
+                        strcpy(token.data+oldlen+1,tokenp->data);
+                    }
+                    break;
+                case StateKeyword:
+                    if(tokenp->type == TokenInteger) {
+                        append_ltokenizedline(*tokenp, &ltokenizedline);
+                        token = create_token();
+                        break;
+                    }
+                    token.type = TokenKeyword;
+                    if ((char*)token.data == NULL) {
+                        token.data = malloc(sizeof(char)*strlen(tokenp->data)+1);
+                        strcpy(token.data,tokenp->data);
+                    } else {
+                        size_t oldlen = strlen(token.data);
+                        token.data = realloc(token.data, oldlen+strlen(tokenp->data)+1);
+                        ((char*)token.data)[oldlen] = ' ';
+                        strcpy(token.data+oldlen+1,tokenp->data);
+                    }
+                    if(strcmp("baking", tokenp->data)
+                            && strcmp("mixing", tokenp->data)) {
+                        append_ltokenizedline(token,&ltokenizedline);
+                        token = create_token();
+                    }
+                    if(!strcmp("Take", tokenp->data)
+                            || !strcmp("Put", tokenp->data)
+                            || !strcmp("Fold", tokenp->data)
+                            || (!strcmp("Add", tokenp->data) && tokenp-linep->tokenv < linep->tokenc+1 && strcmp("dry", tokenp++->data))
+                            || !strcmp("Remove", tokenp->data)
+                            || !strcmp("Combine", tokenp->data)
+                            || !strcmp("Divide", tokenp->data)
+                            || !strcmp("Stir", tokenp->data)) {
+                        state = StateIngredient;
+                        break;
+                    }
+                    break;
+            }
+            
+        }
+        append_ltokenizedline(token, &ltokenizedline);
+        token = create_token();
+        TokenizedLine tokenizedline = collapse_ltokenizedline(baseltokenizedline);
+        free_ltokenizedline(baseltokenizedline.next);
+        append_ltokenizedprog(tokenizedline, &ltokenizedprog);
+        baseltokenizedline = create_ltokenizedline();
+        ltokenizedline = &baseltokenizedline;
+        state = StateNone;
+    }
+
+             
+    TokenizedProg tokenized;
+    // Flattening
+    tokenized = collapse_ltokenizedprog(baseltokenizedprog);
+    // Free everything
+    free_ltokenizedline(baseltokenizedline.next);
+    free_ltokenizedprog(baseltokenizedprog.next);
+    
+    return tokenized;
 }

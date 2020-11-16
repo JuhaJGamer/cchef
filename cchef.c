@@ -66,6 +66,7 @@ void compile_unit(FILE* f) {
     fprintf(stderr, "---\n");
     fprintf(stderr, "%s\n", prog);
     TokenizedProg tokenized = lex(prog);
+    char* measures[11] = {"g", "kg", "pinch", "ml", "dash", "l", "cup", "tsp", "tblsp", "heaping", "level"};
     for(TokenizedLine* line = tokenized.linev; line-tokenized.linev < tokenized.linec; line++) {
         for(Token* token = line->tokenv; token-line->tokenv < line->tokenc; token++) {
             switch(token->type) {
@@ -77,6 +78,15 @@ void compile_unit(FILE* f) {
                     break;
                 case TokenWord:
                     fprintf(stderr, "[ Word '%s' ] ", (char*)token->data);
+                    break;
+                case TokenMeasure:
+                    fprintf(stderr, "[ Measure %s ] ", measures[token->id]);
+                    break;
+                case TokenIngredient:
+                    fprintf(stderr, "[ Ing %s ] ", (char*)token->data);
+                    break;
+                case TokenKeyword:
+                    fprintf(stderr, "[ Kword %s ] ", (char*)token->data);
                     break;
             }
         }
