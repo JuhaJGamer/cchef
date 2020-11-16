@@ -83,6 +83,8 @@ TokenizedProg lexer_parsing_pass(const char* prog) {
     int state = StateNone;
 
     for(const char* c = prog; *c != '\0'; c++) {
+        // If not currently reading a lexeme, check if you could
+        // And set the state and token accordingly
         if(state == StateNone) {
             if(*c >= '0' && *c <= '9') {
                 state = StateNumeric; 
@@ -101,10 +103,13 @@ TokenizedProg lexer_parsing_pass(const char* prog) {
                 token = (Token){ TokenSeparator, 0, NULL };
                 state = StateEndLexeme;
             }
-        } else if(state != StateEndLexeme && state != StateEndLine) {
+        } 
+        // Lexeme-interrupting characters and their respective states
+        // Only check these if lexeme isn't already interrupted
+        else if(state != StateEndLexeme && state != StateEndLine) {
             switch(*c) {
                 case '.':
-                    c--;
+                    c--; // Don't skip the character, we want to process it as its own token
                 case ' ':
                     state = StateEndLexeme;
                     break;
@@ -117,37 +122,46 @@ TokenizedProg lexer_parsing_pass(const char* prog) {
         }
         switch(state) {
             case StateEndLine:
+                // Don't create empty lines
                 if(ltokenizedline == &baseltokenizedline)
                     break;
                 ltokenizedline->token = token;
+                // This flattens the linked list into an ordinary array
                 TokenizedLine tokenizedline = collapse_ltokenizedline(baseltokenizedline);
                 for(LinkedTokenizedLine* node = baseltokenizedline.next; node != NULL; free(ltokenizedline)) {
                     ltokenizedline = node;
                     node = node->next;
                 }
+                // And that mess is all settting up an empty line to be added to next, 
+                // and saving the current line
                 baseltokenizedline = create_ltokenizedline((Token) { 0, 0 });
                 ltokenizedline = &baseltokenizedline;
                 ltokenizedprog->line = tokenizedline;
                 ltokenizedprog->next = malloc(sizeof(LinkedTokenizedProg));
                 *ltokenizedprog->next = create_ltokenizedprog((TokenizedLine){ NULL, 0 });
                 ltokenizedprog = ltokenizedprog->next;
+                // Reset token and state
                 token = (Token) { 0, 0, NULL };
                 state = StateNone;
                 break;
             case StateEndLexeme:
                 ltokenizedline->token = token; 
+                // Linked list append
                 ltokenizedline->next = malloc(sizeof(LinkedTokenizedLine));
                 *ltokenizedline->next = create_ltokenizedline((Token){ 0, 0, NULL });
                 ltokenizedline = ltokenizedline->next;
+                // Reset token and state
                 token = (Token) { 0, 0, NULL };
                 state = StateNone;
                 break;
             case StateNumeric:
+                // append decimal digit
                 *(int*)token.data *= 10;
                 *(int*)token.data += *c-'0';
                 break;
             case StateWord:
                 {
+                    // Extend string by 1 character and place *c there
                     char* oldstr = (char*)token.data;
                     size_t l = strlen(oldstr)+1;
                     token.data = malloc((l+1)*sizeof(char));
@@ -161,7 +175,10 @@ TokenizedProg lexer_parsing_pass(const char* prog) {
                 break;
         }
     }
+    // FLattening
     tokenized = collapse_ltokenizedprog(baseltokenizedprog);
+    // Free everything
+    free(ltokenizedline->next);
     for(LinkedTokenizedProg* node = baseltokenizedprog.next; node != NULL; free(ltokenizedprog)) {
         ltokenizedprog = node;
         node = node->next;
