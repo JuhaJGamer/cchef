@@ -119,7 +119,6 @@ TokenizedProg lexer_parsing_pass(const char* prog) {
             case StateEndLine:
                 if(ltokenizedline == &baseltokenizedline)
                     break;
-                fprintf(stderr, "Line!\n");
                 ltokenizedline->token = token;
                 TokenizedLine tokenizedline = collapse_ltokenizedline(baseltokenizedline);
                 for(LinkedTokenizedLine* node = baseltokenizedline.next; node != NULL; free(ltokenizedline)) {
@@ -136,7 +135,6 @@ TokenizedProg lexer_parsing_pass(const char* prog) {
                 state = StateNone;
                 break;
             case StateEndLexeme:
-                fprintf(stderr, "Lexeme!\n");
                 ltokenizedline->token = token; 
                 ltokenizedline->next = malloc(sizeof(LinkedTokenizedLine));
                 *ltokenizedline->next = create_ltokenizedline((Token){ 0, 0, NULL });
