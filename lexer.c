@@ -22,20 +22,41 @@ struct LinkedTokenizedProg {
     LinkedTokenizedProg* next;
     TokenizedLine line;
 };
-
+void append_ltokenizedline(Token token, LinkedTokenizedLine** line);
+void append_ltokenizedprog(TokenizedLine line, LinkedTokenizedProg** prog);
 TokenizedLine collapse_ltokenizedline(LinkedTokenizedLine line);
 TokenizedProg collapse_ltokenizedprog(LinkedTokenizedProg prog);
 LinkedTokenizedLine create_ltokenizedline();
 LinkedTokenizedProg create_ltokenizedprog();
+void free_ltokenizedline(LinkedTokenizedLine*);
+void free_ltokenizedprog(LinkedTokenizedProg*);
 TokenizedProg lexer_parsing_pass(const char* prog);
 TokenizedProg lexer_token_pass(TokenizedProg);
 
-LinkedTokenizedLine create_ltokenizedline(Token token) {
-    return (LinkedTokenizedLine) { NULL, token }; 
+void append_ltokenizedline(Token token, LinkedTokenizedLine** line) {
+    (*line)->token = token;
+    (*line)->next = malloc(sizeof(LinkedTokenizedLine));
+    *(*line)->next = create_ltokenizedline();
+    *line = (*line)->next;
 }
 
-LinkedTokenizedProg create_ltokenizedprog(TokenizedLine line) {
-    return (LinkedTokenizedProg) { NULL, line };
+void append_ltokenizedprog(TokenizedLine line, LinkedTokenizedProg** prog) {
+    (*prog)->line = line;
+    (*prog)->next = malloc(sizeof(LinkedTokenizedProg));
+    *(*prog)->next = create_ltokenizedprog();
+    *prog = (*prog)->next;
+}
+
+Token create_token() {
+    return(Token) { 0, 0, NULL };
+}
+
+LinkedTokenizedLine create_ltokenizedline() {
+    return (LinkedTokenizedLine) { NULL, create_token() }; 
+}
+
+LinkedTokenizedProg create_ltokenizedprog() {
+    return (LinkedTokenizedProg) { NULL, (TokenizedLine){ NULL, 0 } };
 }
 
 TokenizedLine collapse_ltokenizedline(LinkedTokenizedLine line) {
@@ -60,6 +81,22 @@ TokenizedProg collapse_ltokenizedprog(LinkedTokenizedProg prog) {
     return collapsed_prog;
 }
 
+void free_ltokenizedline(LinkedTokenizedLine* line) {
+    LinkedTokenizedLine prevline;
+    for(LinkedTokenizedLine* node = line; node != NULL; node = prevline.next) {
+        prevline = *node;
+        free(node);
+    }
+}
+
+void free_ltokenizedprog(LinkedTokenizedProg* prog) {
+    LinkedTokenizedProg prevelem;
+    for(LinkedTokenizedProg* node = prog; node != NULL; node = prevelem.next) {
+        prevelem = *node;
+        free(node);
+    }
+}
+
 TokenizedProg lex(const char* prog) {
     TokenizedProg tokenized;
     tokenized = lexer_parsing_pass(prog);
@@ -75,7 +112,7 @@ TokenizedProg lexer_parsing_pass(const char* prog) {
 
     LinkedTokenizedLine baseltokenizedline;
     LinkedTokenizedLine* ltokenizedline = &baseltokenizedline;
-    LinkedTokenizedProg baseltokenizedprog = create_ltokenizedprog((TokenizedLine){ NULL, 0 });
+    LinkedTokenizedProg baseltokenizedprog = create_ltokenizedprog();
     LinkedTokenizedProg* ltokenizedprog = &baseltokenizedprog;
     Token token = (Token){ 0, 0, NULL};
 
@@ -122,34 +159,25 @@ TokenizedProg lexer_parsing_pass(const char* prog) {
         }
         switch(state) {
             case StateEndLine:
-                // Don't create empty lines
-                if(ltokenizedline == &baseltokenizedline)
+                {
+                    // Don't create empty lines
+                    if(ltokenizedline == &baseltokenizedline)
+                        break;
+                    // Save, flatten line, and append it
+                    ltokenizedline->token = token;
+                    TokenizedLine tokenizedline = collapse_ltokenizedline(baseltokenizedline);
+                    free_ltokenizedline(baseltokenizedline.next);
+                    append_ltokenizedprog(tokenizedline, &ltokenizedprog);
+                    // Set up next (empty) line
+                    baseltokenizedline = create_ltokenizedline();
+                    ltokenizedline = &baseltokenizedline;
+                    // Reset token and state
+                    token = (Token) { 0, 0, NULL };
+                    state = StateNone;
                     break;
-                ltokenizedline->token = token;
-                // This flattens the linked list into an ordinary array
-                TokenizedLine tokenizedline = collapse_ltokenizedline(baseltokenizedline);
-                for(LinkedTokenizedLine* node = baseltokenizedline.next; node != NULL; free(ltokenizedline)) {
-                    ltokenizedline = node;
-                    node = node->next;
                 }
-                // And that mess is all settting up an empty line to be added to next, 
-                // and saving the current line
-                baseltokenizedline = create_ltokenizedline((Token) { 0, 0 });
-                ltokenizedline = &baseltokenizedline;
-                ltokenizedprog->line = tokenizedline;
-                ltokenizedprog->next = malloc(sizeof(LinkedTokenizedProg));
-                *ltokenizedprog->next = create_ltokenizedprog((TokenizedLine){ NULL, 0 });
-                ltokenizedprog = ltokenizedprog->next;
-                // Reset token and state
-                token = (Token) { 0, 0, NULL };
-                state = StateNone;
-                break;
             case StateEndLexeme:
-                ltokenizedline->token = token; 
-                // Linked list append
-                ltokenizedline->next = malloc(sizeof(LinkedTokenizedLine));
-                *ltokenizedline->next = create_ltokenizedline((Token){ 0, 0, NULL });
-                ltokenizedline = ltokenizedline->next;
+                append_ltokenizedline(token, &ltokenizedline);
                 // Reset token and state
                 token = (Token) { 0, 0, NULL };
                 state = StateNone;
@@ -162,6 +190,7 @@ TokenizedProg lexer_parsing_pass(const char* prog) {
             case StateWord:
                 {
                     // Extend string by 1 character and place *c there
+                    // This is horrible 
                     char* oldstr = (char*)token.data;
                     size_t l = strlen(oldstr)+1;
                     token.data = malloc((l+1)*sizeof(char));
@@ -175,14 +204,12 @@ TokenizedProg lexer_parsing_pass(const char* prog) {
                 break;
         }
     }
-    // FLattening
+    // Flattening
     tokenized = collapse_ltokenizedprog(baseltokenizedprog);
     // Free everything
-    free(ltokenizedline->next);
-    for(LinkedTokenizedProg* node = baseltokenizedprog.next; node != NULL; free(ltokenizedprog)) {
-        ltokenizedprog = node;
-        node = node->next;
-    }
+    free_ltokenizedline(baseltokenizedline.next);
+    free_ltokenizedprog(baseltokenizedprog.next);
+    
     return tokenized;
 }
 
@@ -192,5 +219,6 @@ TokenizedProg lexer_parsing_pass(const char* prog) {
  */
 TokenizedProg lexer_token_pass(TokenizedProg prog) {
     // TODO: code
+
     return prog;
 }
