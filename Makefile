@@ -1,5 +1,5 @@
 CC			:= gcc
-CCFLAGS 	:= -Wall --std=c99
+CFLAGS 	:= -Wall --std=c99
 DCFLAGS		:= -g
 LDFLGAS		:=
 
@@ -17,9 +17,6 @@ clean:
 
 debug: CCFLAGS += $(DCFLAGS)
 debug: $(TARGETS)
-
-$(OBJS) : %.o: %.c $(DEPS)
-	$(CC) $(CCFLAGS) -c -o $@ $<  
 
 $(TARGETS) : % : $(filter-out $(MAINS), $(OBJS)) %.o
 	$(CC) -o $@ $(LIBS) $^ $(CCFLAGS) $(LDFLAGS)
