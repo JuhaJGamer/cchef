@@ -27,6 +27,8 @@ TokenizedLine collapse_ltokenizedline(LinkedTokenizedLine line);
 TokenizedProg collapse_ltokenizedprog(LinkedTokenizedProg prog);
 LinkedTokenizedLine create_ltokenizedline();
 LinkedTokenizedProg create_ltokenizedprog();
+TokenizedProg lexer_parsing_pass(const char* prog);
+TokenizedProg lexer_token_pass(TokenizedProg);
 
 LinkedTokenizedLine create_ltokenizedline(Token token) {
     return (LinkedTokenizedLine) { NULL, token }; 
@@ -59,6 +61,16 @@ TokenizedProg collapse_ltokenizedprog(LinkedTokenizedProg prog) {
 }
 
 TokenizedProg lex(const char* prog) {
+    TokenizedProg tokenized;
+    tokenized = lexer_parsing_pass(prog);
+    tokenized = lexer_token_pass(tokenized);
+    return tokenized;
+}
+
+/* Tokenizes program, but only recognizes tokens which start with distinct characters
+ * Subject to second pass to tokenize properly, 
+ * this is basically a cleanup/initial parsing pass */
+TokenizedProg lexer_parsing_pass(const char* prog) {
     TokenizedProg tokenized;  
 
     LinkedTokenizedLine baseltokenizedline;
@@ -156,5 +168,14 @@ TokenizedProg lex(const char* prog) {
         ltokenizedprog = node;
         node = node->next;
     }
-    return relex(tokenized);
+    return tokenized;
+}
+
+/*
+ * Tokenizes pre-tokenized "clean" program
+ * Recognizes (some) context to turn "Word" into "Measure" or "Keyword"
+ */
+TokenizedProg lexer_token_pass(TokenizedProg prog) {
+    // TODO: code
+    return prog;
 }
