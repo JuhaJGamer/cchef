@@ -58,7 +58,11 @@ void compile_unit(FILE* f) {
     fprintf(stderr,"read file into buffer of size %lu\n", fsize);
     prog[fsize] = '\0';
     fprintf(stderr, "%s\n", prog);
-    prog = preprocess(prog);
+    {
+        char* tprog = preprocess(prog);
+        free(prog);
+        prog = tprog;
+    }
     fprintf(stderr, "---\n");
     fprintf(stderr, "%s\n", prog);
     TokenizedProg tokenized = lex(prog);
@@ -100,5 +104,6 @@ char* preprocess(const char* prog) {
         }
     }
     *process_p = '\0';
+    processed_prog = realloc(processed_prog, strlen(processed_prog)*sizeof(char));
     return processed_prog;
 }
